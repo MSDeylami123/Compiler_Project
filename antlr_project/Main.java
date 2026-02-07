@@ -4,13 +4,35 @@ import org.antlr.v4.runtime.tree.*;
 
 public class Main {
 
+    // ===============================
+    // TOKEN INFO CLASS
+    // ===============================
+    static class TokenInfo {
+        String text;
+        String type;
+        int line;
+        int column;
+
+        TokenInfo(String text, String type, int line, int column) {
+            this.text = text;
+            this.type = type;
+            this.line = line;
+            this.column = column;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s('%s') at [%d:%d]", type, text, line, column);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
 
         // -------- TOKENIZE FILES --------
-        List<String> tokens1 = tokenize("input1.txt");
-        List<String> tokens2 = tokenize("input2.txt");
+        List<TokenInfo> tokens1 = tokenize("input1.txt");
+        List<TokenInfo> tokens2 = tokenize("input2.txt");
 
-        System.out.println("Tokens in file 1: " + tokens1.size());
+        System.out.println("\nTokens in file 1: " + tokens1.size());
         System.out.println("Tokens in file 2: " + tokens2.size());
 
         int dist = editDistance(tokens1, tokens2);
@@ -19,26 +41,30 @@ public class Main {
         double similarity = 1.0 - (double) dist / maxLen;
         double percent = similarity * 100.0;
 
-        System.out.printf("Token-based Similarity: %.2f%%\n", percent);
+        System.out.printf("\nToken-based Similarity: %.2f%%\n", percent);
         System.out.println("Decision: " + (percent >= 60 ? "Similar" : "Not Similar"));
+
+        // -------- TOKEN-LEVEL VISUALIZATION --------
+        printTokenComparison(tokens1, tokens2);
 
         // -------- PARSE TREE DEMO --------
         System.out.println("\n===== PARSE TREE (input1.txt) =====");
         parseAndPrintTree("input1.txt");
+        System.out.println("\n===== PARSE TREE (input2.txt) =====");
+        parseAndPrintTree("input2.txt");
     }
 
     // ===============================
-    // TOKENIZATION (CLEAN VERSION)
+    // TOKENIZATION WITH POSITIONS
     // ===============================
-    static List<String> tokenize(String filename) throws Exception {
+    static List<TokenInfo> tokenize(String filename) throws Exception {
 
         CharStream input = CharStreams.fromFileName(filename);
         ExprLexer lexer = new ExprLexer(input);
-
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         tokens.fill();
 
-        List<String> result = new ArrayList<>();
+        List<TokenInfo> result = new ArrayList<>();
 
         System.out.println("\n===== TOKENS (" + filename + ") =====");
 
@@ -48,19 +74,84 @@ public class Main {
             String symbolic = ExprLexer.VOCABULARY.getSymbolicName(t.getType());
             String text = t.getText();
 
-            System.out.printf("%-15s -> '%s'\n", symbolic, text);
+            System.out.printf(
+                "%-15s -> '%s' [%d:%d]\n",
+                symbolic, text, t.getLine(), t.getCharPositionInLine()
+            );
 
-            // Normalization for similarity
+            // Normalize tokens for similarity
+            String normalized;
             if ("ID".equals(symbolic)) {
-                result.add("ID");
+                normalized = "ID";
             } else if ("NUMBER".equals(symbolic) || "FLOAT".equals(symbolic)) {
-                result.add("NUM");
+                normalized = "NUM";
             } else if (!"WS".equals(symbolic)) {
-                result.add(symbolic);
+                normalized = symbolic;
+            } else {
+                continue;
             }
+
+            result.add(new TokenInfo(
+                text,
+                normalized,
+                t.getLine(),
+                t.getCharPositionInLine()
+            ));
         }
 
         return result;
+    }
+
+    // ===============================
+    // TOKEN-LEVEL SIMILARITY VIEW
+    // ===============================
+    static void printTokenComparison(List<TokenInfo> a, List<TokenInfo> b) {
+
+        int n = a.size(), m = b.size();
+        int[][] dp = new int[n + 1][m + 1];
+
+        for (int i = 0; i <= n; i++) dp[i][0] = i;
+        for (int j = 0; j <= m; j++) dp[0][j] = j;
+
+        for (int i = 1; i <= n; i++) {
+            for (int j = 1; j <= m; j++) {
+                if (a.get(i - 1).type.equals(b.get(j - 1).type)) {
+                    dp[i][j] = dp[i - 1][j - 1];
+                } else {
+                    dp[i][j] = 1 + Math.min(
+                            dp[i - 1][j - 1],
+                            Math.min(dp[i - 1][j], dp[i][j - 1])
+                    );
+                }
+            }
+        }
+
+        int i = n, j = m;
+        List<String> outA = new ArrayList<>();
+        List<String> outB = new ArrayList<>();
+
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && a.get(i - 1).type.equals(b.get(j - 1).type)) {
+                outA.add("[MATCH] " + a.get(i - 1));
+                outB.add("[MATCH] " + b.get(j - 1));
+                i--; j--;
+            } else if (i > 0 && (j == 0 || dp[i][j] == dp[i - 1][j] + 1)) {
+                outA.add("[DIFF ] " + a.get(i - 1));
+                i--;
+            } else if (j > 0) {
+                outB.add("[DIFF ] " + b.get(j - 1));
+                j--;
+            }
+        }
+
+        Collections.reverse(outA);
+        Collections.reverse(outB);
+
+        System.out.println("\n--- Token comparison (File 1) ---");
+        outA.forEach(System.out::println);
+
+        System.out.println("\n--- Token comparison (File 2) ---");
+        outB.forEach(System.out::println);
     }
 
     // ===============================
@@ -73,16 +164,14 @@ public class Main {
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         ExprParser parser = new ExprParser(tokens);
 
-        parser.setBuildParseTree(true);
-
         ParseTree tree = parser.prog();
         System.out.println(tree.toStringTree(parser));
     }
 
     // ===============================
-    // EDIT DISTANCE (UNCHANGED)
+    // EDIT DISTANCE (TOKEN TYPES)
     // ===============================
-    static int editDistance(List<String> a, List<String> b) {
+    static int editDistance(List<TokenInfo> a, List<TokenInfo> b) {
 
         int n = a.size();
         int m = b.size();
@@ -93,7 +182,7 @@ public class Main {
 
         for (int i = 1; i <= n; i++) {
             for (int j = 1; j <= m; j++) {
-                if (a.get(i - 1).equals(b.get(j - 1))) {
+                if (a.get(i - 1).type.equals(b.get(j - 1).type)) {
                     dp[i][j] = dp[i - 1][j - 1];
                 } else {
                     dp[i][j] = 1 + Math.min(
