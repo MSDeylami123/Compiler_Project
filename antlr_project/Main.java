@@ -48,10 +48,20 @@ public class Main {
         printTokenComparison(tokens1, tokens2);
 
         // -------- PARSE TREE DEMO --------
-        System.out.println("\n===== PARSE TREE (input1.txt) =====");
-        parseAndPrintTree("input1.txt");
-        System.out.println("\n===== PARSE TREE (input2.txt) =====");
-        parseAndPrintTree("input2.txt");
+        //System.out.println("\n===== PARSE TREE (input1.txt) =====");
+        //parseAndPrintTree("input1.txt");
+        //System.out.println("\n===== PARSE TREE (input2.txt) =====");
+        //parseAndPrintTree("input2.txt");
+
+
+
+        // -------- Phase 2 -> AST --------
+        ASTNode ast1 = buildAST("input1.txt");
+        ASTNode ast2 = buildAST("input2.txt");
+
+        double astSim = ASTComparator.similarity(ast1, ast2);
+        System.out.printf("\nAST-based Similarity: %.2f%%\n", astSim * 100);
+
     }
 
     // ===============================
@@ -195,4 +205,16 @@ public class Main {
 
         return dp[n][m];
     }
+
+    static ASTNode buildAST(String filename) throws Exception {
+        CharStream input = CharStreams.fromFileName(filename);
+        ExprLexer lexer = new ExprLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        ExprParser parser = new ExprParser(tokens);
+
+        ParseTree tree = parser.prog();
+        ASTBuilder builder = new ASTBuilder();
+        return builder.visit(tree);
+    }
+
 }
