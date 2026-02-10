@@ -47,14 +47,6 @@ public class Main {
         // -------- TOKEN-LEVEL VISUALIZATION --------
         printTokenComparison(tokens1, tokens2);
 
-        // -------- PARSE TREE DEMO --------
-        //System.out.println("\n===== PARSE TREE (input1.txt) =====");
-        //parseAndPrintTree("input1.txt");
-        //System.out.println("\n===== PARSE TREE (input2.txt) =====");
-        //parseAndPrintTree("input2.txt");
-
-
-
         // -------- Phase 2 -> AST --------
         ASTNode ast1 = buildAST("input1.txt");
         ASTNode ast2 = buildAST("input2.txt");
@@ -62,10 +54,12 @@ public class Main {
         double astSim = ASTComparator.similarity(ast1, ast2);
         System.out.printf("\nAST-based Similarity: %.2f%%\n", astSim * 100);
 
+        System.out.println("\n===== AST STRUCTURAL DIFF =====");
+        ASTDiffPrinter.print(ast1, ast2);
     }
 
     // ===============================
-    // TOKENIZATION WITH POSITIONS
+    // TOKENIZATION (NO NORMALIZATION)
     // ===============================
     static List<TokenInfo> tokenize(String filename) throws Exception {
 
@@ -84,26 +78,16 @@ public class Main {
             String symbolic = ExprLexer.VOCABULARY.getSymbolicName(t.getType());
             String text = t.getText();
 
+            if ("WS".equals(symbolic)) continue;
+
             System.out.printf(
                 "%-15s -> '%s' [%d:%d]\n",
                 symbolic, text, t.getLine(), t.getCharPositionInLine()
             );
 
-            // Normalize tokens for similarity
-            String normalized;
-            if ("ID".equals(symbolic)) {
-                normalized = "ID";
-            } else if ("NUMBER".equals(symbolic) || "FLOAT".equals(symbolic)) {
-                normalized = "NUM";
-            } else if (!"WS".equals(symbolic)) {
-                normalized = symbolic;
-            } else {
-                continue;
-            }
-
             result.add(new TokenInfo(
                 text,
-                normalized,
+                symbolic,
                 t.getLine(),
                 t.getCharPositionInLine()
             ));
@@ -125,7 +109,10 @@ public class Main {
 
         for (int i = 1; i <= n; i++) {
             for (int j = 1; j <= m; j++) {
-                if (a.get(i - 1).type.equals(b.get(j - 1).type)) {
+                TokenInfo ta = a.get(i - 1);
+                TokenInfo tb = b.get(j - 1);
+
+                if (ta.type.equals(tb.type) && ta.text.equals(tb.text)) {
                     dp[i][j] = dp[i - 1][j - 1];
                 } else {
                     dp[i][j] = 1 + Math.min(
@@ -141,11 +128,19 @@ public class Main {
         List<String> outB = new ArrayList<>();
 
         while (i > 0 || j > 0) {
-            if (i > 0 && j > 0 && a.get(i - 1).type.equals(b.get(j - 1).type)) {
-                outA.add("[MATCH] " + a.get(i - 1));
-                outB.add("[MATCH] " + b.get(j - 1));
-                i--; j--;
-            } else if (i > 0 && (j == 0 || dp[i][j] == dp[i - 1][j] + 1)) {
+            if (i > 0 && j > 0) {
+                TokenInfo ta = a.get(i - 1);
+                TokenInfo tb = b.get(j - 1);
+
+                if (ta.type.equals(tb.type) && ta.text.equals(tb.text)) {
+                    outA.add("[MATCH] " + ta);
+                    outB.add("[MATCH] " + tb);
+                    i--; j--;
+                    continue;
+                }
+            }
+
+            if (i > 0 && (j == 0 || dp[i][j] == dp[i - 1][j] + 1)) {
                 outA.add("[DIFF ] " + a.get(i - 1));
                 i--;
             } else if (j > 0) {
@@ -165,21 +160,7 @@ public class Main {
     }
 
     // ===============================
-    // PARSE TREE OUTPUT
-    // ===============================
-    static void parseAndPrintTree(String filename) throws Exception {
-
-        CharStream input = CharStreams.fromFileName(filename);
-        ExprLexer lexer = new ExprLexer(input);
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
-        ExprParser parser = new ExprParser(tokens);
-
-        ParseTree tree = parser.prog();
-        System.out.println(tree.toStringTree(parser));
-    }
-
-    // ===============================
-    // EDIT DISTANCE (TOKEN TYPES)
+    // EDIT DISTANCE (TYPE + TEXT)
     // ===============================
     static int editDistance(List<TokenInfo> a, List<TokenInfo> b) {
 
@@ -192,7 +173,10 @@ public class Main {
 
         for (int i = 1; i <= n; i++) {
             for (int j = 1; j <= m; j++) {
-                if (a.get(i - 1).type.equals(b.get(j - 1).type)) {
+                TokenInfo ta = a.get(i - 1);
+                TokenInfo tb = b.get(j - 1);
+
+                if (ta.type.equals(tb.type) && ta.text.equals(tb.text)) {
                     dp[i][j] = dp[i - 1][j - 1];
                 } else {
                     dp[i][j] = 1 + Math.min(
@@ -206,6 +190,9 @@ public class Main {
         return dp[n][m];
     }
 
+    // ===============================
+    // AST BUILDER ENTRY
+    // ===============================
     static ASTNode buildAST(String filename) throws Exception {
         CharStream input = CharStreams.fromFileName(filename);
         ExprLexer lexer = new ExprLexer(input);
@@ -216,5 +203,4 @@ public class Main {
         ASTBuilder builder = new ASTBuilder();
         return builder.visit(tree);
     }
-
 }
