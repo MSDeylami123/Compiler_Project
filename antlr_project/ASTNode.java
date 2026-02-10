@@ -26,4 +26,11 @@ public class ASTNode {
             s += c.size();
         return s;
     }
+
+    public boolean isUnordered() {
+        return type == ASTType.PROGRAM
+            || type == ASTType.BLOCK
+            || type == ASTType.FUNCTION;
+    }
+
 }

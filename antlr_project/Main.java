@@ -56,6 +56,10 @@ public class Main {
 
         System.out.println("\n===== AST STRUCTURAL DIFF =====");
         ASTDiffPrinter.print(ast1, ast2);
+
+        printAST(ast1, 0);
+        printAST(ast2, 0);
+
     }
 
     // ===============================
@@ -201,6 +205,16 @@ public class Main {
 
         ParseTree tree = parser.prog();
         ASTBuilder builder = new ASTBuilder();
-        return builder.visit(tree);
+        ASTNode ast = builder.visit(tree);
+
+        // NEW
+        return ASTNormalizer.normalize(ast);
     }
+
+    static void printAST(ASTNode node, int indent) {
+        System.out.println("  ".repeat(indent) + node.type);
+        for (ASTNode c : node.children)
+            printAST(c, indent + 1);
+    }
+
 }
