@@ -1,2 +1,19 @@
-a = 1;
-b = 2;
+int compute(int value) {
+    int counter = 0;
+    int acc = 0;
+
+    while (counter < value) {
+        if (counter == 0) {
+            acc = counter + acc;
+        }
+        counter = counter + 1;
+    }
+
+    return acc;
+}
+
+int main() {
+    int num = 10;
+    int output = compute(num);
+    return output;
+}
