@@ -1,2 +1,25 @@
-if (x)
-    a = 1;
+int sumEven(int n) {
+    int i = 0;
+    int sum = 0;
+
+    while (i <= n) {
+        if (i - 2 == 0) {
+            sum = sum + i;
+        }
+        i = i + 1;
+    }
+
+    return sum;
+}
+
+int main() {
+    int result = sumEven(10);
+
+    if (result > 20) {
+        result = result - 5;
+    } else {
+        result = result + 5;
+    }
+
+    return result;
+}
