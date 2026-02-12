@@ -1,11 +1,2 @@
-int foo() {
-    int x = 5;
-    int y = 6;
-    int z = x + y;
-    return z;
-}
-
-int unrelated() {
-    int k = 10;
-    return k;
-}
+while (x)
+    a = 1;

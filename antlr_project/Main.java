@@ -73,6 +73,27 @@ public class Main {
         System.out.println("AST Decision: " + (weightedSim >= 0.6 ? "Similar" : "Not Similar"));
 
 
+        CFGBuilder builder = new CFGBuilder();
+        CFG cfg1 = builder.build(ast1);
+        CFG cfg2 = builder.build(ast2);
+
+        CFGComparator comparator = new CFGComparator();
+        double cfgScore = comparator.compare(cfg1, cfg2);
+
+        System.out.println("CFG Similarity: " + cfgScore);
+
+        System.out.println("CFG 1:");
+        CFGPrinter.print(cfg1);
+
+        System.out.println("\nCFG 2:");
+        CFGPrinter.print(cfg2);
+
+        
+
+
+
+
+
 
     }
 
