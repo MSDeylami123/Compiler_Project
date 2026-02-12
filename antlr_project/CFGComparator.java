@@ -8,9 +8,8 @@ public class CFGComparator {
         double edgeScore = compareEdgeCount(cfg1, cfg2);
         double labelScore = compareLabelFrequency(cfg1, cfg2);
         double cycleScore = compareCycles(cfg1, cfg2);
-        double pathScore = comparePaths(cfg1, cfg2); // NEW
+        double pathScore = comparePaths(cfg1, cfg2);
 
-        // Behavioral similarity weighted highest
         return (
                 nodeScore * 0.15 +
                 edgeScore * 0.15 +
@@ -21,19 +20,28 @@ public class CFGComparator {
     }
 
     // =========================================================
-    // 1️⃣ Node Count Similarity
+    // 1️⃣ Node Count Similarity (ignores EMPTY)
     // =========================================================
     private double compareNodeCount(CFG c1, CFG c2) {
-        int n1 = c1.getNodes().size();
-        int n2 = c2.getNodes().size();
+        int n1 = countNonEmptyNodes(c1);
+        int n2 = countNonEmptyNodes(c2);
 
         if (Math.max(n1, n2) == 0) return 1.0;
 
         return 1.0 - (Math.abs(n1 - n2) / (double) Math.max(n1, n2));
     }
 
+    private int countNonEmptyNodes(CFG cfg) {
+        int count = 0;
+        for (CFGNode node : cfg.getNodes()) {
+            if (!node.getLabel().equals("EMPTY"))
+                count++;
+        }
+        return count;
+    }
+
     // =========================================================
-    // 2️⃣ Edge Count Similarity
+    // 2️⃣ Edge Count Similarity (ignores EMPTY nodes/edges)
     // =========================================================
     private double compareEdgeCount(CFG c1, CFG c2) {
         int e1 = countEdges(c1);
@@ -46,13 +54,23 @@ public class CFGComparator {
 
     private int countEdges(CFG cfg) {
         int count = 0;
-        for (CFGNode node : cfg.getNodes())
-            count += node.getSuccessors().size();
+
+        for (CFGNode node : cfg.getNodes()) {
+
+            if (node.getLabel().equals("EMPTY"))
+                continue;
+
+            for (CFGNode succ : node.getSuccessors()) {
+                if (!succ.getLabel().equals("EMPTY"))
+                    count++;
+            }
+        }
+
         return count;
     }
 
     // =========================================================
-    // 3️⃣ Label Frequency Similarity
+    // 3️⃣ Label Frequency Similarity (ignores EMPTY)
     // =========================================================
     private double compareLabelFrequency(CFG c1, CFG c2) {
 
@@ -81,15 +99,21 @@ public class CFGComparator {
 
     private Map<String, Integer> labelFrequency(CFG cfg) {
         Map<String, Integer> map = new HashMap<>();
+
         for (CFGNode node : cfg.getNodes()) {
+
+            if (node.getLabel().equals("EMPTY"))
+                continue;
+
             map.put(node.getLabel(),
                     map.getOrDefault(node.getLabel(), 0) + 1);
         }
+
         return map;
     }
 
     // =========================================================
-    // 4️⃣ Cycle Detection
+    // 4️⃣ Cycle Detection (unchanged)
     // =========================================================
     private double compareCycles(CFG c1, CFG c2) {
         boolean hasCycle1 = hasCycle(c1);
@@ -132,7 +156,7 @@ public class CFGComparator {
     }
 
     // =========================================================
-    // 5️⃣ NEW: Execution Path Similarity (Behavioral)
+    // 5️⃣ Path Similarity (ignores EMPTY in path labels)
     // =========================================================
     private double comparePaths(CFG c1, CFG c2) {
 
@@ -170,10 +194,11 @@ public class CFGComparator {
                           Set<String> paths,
                           int depth) {
 
-        // Prevent infinite loop explosion
         if (depth > 20) return;
 
-        currentPath.add(node.getLabel());
+        if (!node.getLabel().equals("EMPTY")) {
+            currentPath.add(node.getLabel());
+        }
 
         if (node == exit) {
             paths.add(String.join("->", currentPath));

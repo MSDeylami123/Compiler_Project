@@ -4,7 +4,6 @@ public class CFGBuilder {
 
     private int nodeCounter = 0;
 
-    // Helper class representing entry/exit pair
     private static class CFGFragment {
         CFGNode entry;
         CFGNode exit;
@@ -17,16 +16,15 @@ public class CFGBuilder {
 
     public CFG build(ASTNode root) {
         CFG cfg = new CFG();
-
         CFGFragment fragment = buildFragment(root, cfg);
-
         cfg.setEntry(fragment.entry);
         cfg.setExit(fragment.exit);
-
         return cfg;
     }
 
-    // Main recursive builder
+    // ========================================
+    // MAIN DISPATCH
+    // ========================================
     private CFGFragment buildFragment(ASTNode node, CFG cfg) {
 
         switch (node.type) {
@@ -42,9 +40,13 @@ public class CFGBuilder {
             case WHILE:
                 return buildWhile(node, cfg);
 
+            case FOR:
+                return buildFor(node, cfg);   // ✅ NEW
+
             case ASSIGN:
             case RETURN:
             case FUNCTION_CALL:
+            case VAR_DECL:
                 return buildSimple(node, cfg);
 
             default:
@@ -52,22 +54,20 @@ public class CFGBuilder {
         }
     }
 
-    // ----------------------------------------
+    // ========================================
     // SIMPLE STATEMENT
-    // ----------------------------------------
+    // ========================================
     private CFGFragment buildSimple(ASTNode node, CFG cfg) {
 
-        String label = node.type.toString();
-
-        CFGNode stmtNode = new CFGNode(nextId(), label);
+        CFGNode stmtNode = new CFGNode(nextId(), node.type.toString());
         cfg.addNode(stmtNode);
 
         return new CFGFragment(stmtNode, stmtNode);
     }
 
-    // ----------------------------------------
+    // ========================================
     // BLOCK / SEQUENCE
-    // ----------------------------------------
+    // ========================================
     private CFGFragment buildBlock(ASTNode node, CFG cfg) {
 
         if (node.children.isEmpty()) {
@@ -95,82 +95,122 @@ public class CFGBuilder {
         return new CFGFragment(first.entry, prev.exit);
     }
 
-    // ----------------------------------------
-    // IF STATEMENT
-    // ----------------------------------------
+    // ========================================
+    // IF
+    // ========================================
     private CFGFragment buildIf(ASTNode node, CFG cfg) {
 
-        // Create condition node
         CFGNode conditionNode = new CFGNode(nextId(), "IF");
         cfg.addNode(conditionNode);
 
-        // Expected structure:
-        // children[0] = condition expression
-        // children[1] = then block
-        // children[2] = else block (optional)
-
-        ASTNode thenNode = node.children.size() > 1 ? node.children.get(1) : null;
+        ASTNode thenNode = node.children.get(1);
         ASTNode elseNode = node.children.size() > 2 ? node.children.get(2) : null;
 
         CFGFragment thenFrag = buildFragment(thenNode, cfg);
-
         CFGFragment elseFrag = null;
-        if (elseNode != null) {
+
+        if (elseNode != null)
             elseFrag = buildFragment(elseNode, cfg);
-        }
 
         CFGNode mergeNode = new CFGNode(nextId(), "MERGE");
         cfg.addNode(mergeNode);
 
-        // condition -> then
         conditionNode.addSuccessor(thenFrag.entry);
         thenFrag.exit.addSuccessor(mergeNode);
 
         if (elseFrag != null) {
-            // condition -> else
             conditionNode.addSuccessor(elseFrag.entry);
             elseFrag.exit.addSuccessor(mergeNode);
         } else {
-            // no else
             conditionNode.addSuccessor(mergeNode);
         }
 
         return new CFGFragment(conditionNode, mergeNode);
     }
 
-    // ----------------------------------------
-    // WHILE LOOP
-    // ----------------------------------------
+    // ========================================
+    // WHILE
+    // ========================================
     private CFGFragment buildWhile(ASTNode node, CFG cfg) {
 
-        // children[0] = condition
-        // children[1] = body
-
-        CFGNode conditionNode = new CFGNode(nextId(), "WHILE");
+        CFGNode conditionNode = new CFGNode(nextId(), "LOOP_COND");
         cfg.addNode(conditionNode);
 
-        ASTNode bodyNode = node.children.size() > 1 ? node.children.get(1) : null;
-
+        ASTNode bodyNode = node.children.get(1);
         CFGFragment bodyFrag = buildFragment(bodyNode, cfg);
 
-        CFGNode exitNode = new CFGNode(nextId(), "WHILE_EXIT");
+        CFGNode exitNode = new CFGNode(nextId(), "LOOP_EXIT");
         cfg.addNode(exitNode);
 
-        // condition -> body
+        // cond -> body
         conditionNode.addSuccessor(bodyFrag.entry);
 
-        // body -> condition (loop back)
+        // body -> cond
         bodyFrag.exit.addSuccessor(conditionNode);
 
-        // condition -> exit
+        // cond -> exit
         conditionNode.addSuccessor(exitNode);
 
         return new CFGFragment(conditionNode, exitNode);
     }
 
-    // ----------------------------------------
-    // ID generator
-    // ----------------------------------------
+    // ========================================
+    // ✅ FOR (Normalized to WHILE)
+    // ========================================
+    private CFGFragment buildFor(ASTNode node, CFG cfg) {
+
+        // Expected:
+        // [0] init
+        // [1] condition
+        // [2] update
+        // [3] body (optional in malformed cases)
+
+        ASTNode initNode = node.children.size() > 0 ? node.children.get(0) : null;
+        ASTNode condNode = node.children.size() > 1 ? node.children.get(1) : null;
+        ASTNode updateNode = node.children.size() > 2 ? node.children.get(2) : null;
+        ASTNode bodyNode = node.children.size() > 3 ? node.children.get(3) : null;
+
+        // 1️⃣ INIT
+        CFGFragment initFrag = initNode != null
+                ? buildFragment(initNode, cfg)
+                : buildSimple(new ASTNode(ASTType.EMPTY), cfg);
+
+        // 2️⃣ LOOP CONDITION
+        CFGNode conditionNode = new CFGNode(nextId(), "LOOP_COND");
+        cfg.addNode(conditionNode);
+
+        initFrag.exit.addSuccessor(conditionNode);
+
+        // 3️⃣ BODY
+        CFGFragment bodyFrag = bodyNode != null
+                ? buildFragment(bodyNode, cfg)
+                : buildSimple(new ASTNode(ASTType.EMPTY), cfg);
+
+        // 4️⃣ UPDATE
+        CFGFragment updateFrag = updateNode != null
+                ? buildFragment(updateNode, cfg)
+                : buildSimple(new ASTNode(ASTType.EMPTY), cfg);
+
+        // 5️⃣ EXIT
+        CFGNode exitNode = new CFGNode(nextId(), "LOOP_EXIT");
+        cfg.addNode(exitNode);
+
+        // cond -> body
+        conditionNode.addSuccessor(bodyFrag.entry);
+
+        // body -> update
+        bodyFrag.exit.addSuccessor(updateFrag.entry);
+
+        // update -> cond
+        updateFrag.exit.addSuccessor(conditionNode);
+
+        // cond -> exit
+        conditionNode.addSuccessor(exitNode);
+
+        return new CFGFragment(initFrag.entry, exitNode);
+    }
+
+    // ========================================
     private int nextId() {
         return nodeCounter++;
     }
