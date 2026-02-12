@@ -230,4 +230,41 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
 
         return left;
     }
+
+    @Override
+    public ASTNode visitPostfixExpr(ExprParser.PostfixExprContext ctx) {
+
+        // Just a primary expression (no function call)
+        if (ctx.LPAREN().isEmpty()) {
+            return visit(ctx.primaryExpr());
+        }
+
+        // Start with the base expression (function name or nested expression)
+        ASTNode base = visit(ctx.primaryExpr());
+
+        // Each ( ... ) is one function call
+        for (int i = 0; i < ctx.LPAREN().size(); i++) {
+
+            ASTNode call = new ASTNode(ASTType.FUNCTION_CALL);
+
+            // Add the function being called
+            call.add(base);
+
+            // If this call has arguments
+            if (i < ctx.argumentList().size()) {
+                ExprParser.ArgumentListContext argListCtx = ctx.argumentList(i);
+
+                for (ExprParser.ExprContext arg : argListCtx.expr()) {
+                    call.add(visit(arg));
+                }
+            }
+
+            // The result becomes the base for chained calls
+            base = call;
+        }
+
+        return base;
+    }
+
+
 }

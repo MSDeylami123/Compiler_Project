@@ -3,6 +3,8 @@ public enum ASTType {
     FUNCTION,
     PARAM,
     BLOCK,
+    FUNCTION_CALL,
+
 
     VAR_DECL,
     ASSIGN,
