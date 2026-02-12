@@ -101,17 +101,10 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
 
         ASTNode f = new ASTNode(ASTType.FOR);
 
-        /*
-           Expected grammar structure:
-           FOR '(' (varDecl | assignStat | ';')
-               expr? ';'
-               forUpdate?
-           ')' stat
-        */
+        // =========================
+        // INIT
+        // =========================
 
-        int childIndex = 2; // skip FOR and '('
-
-        // ---- INIT ----
         ASTNode initNode;
 
         if (ctx.varDecl() != null) {
@@ -126,19 +119,24 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
 
         f.add(initNode);
 
-        // ---- CONDITION ----
+        // =========================
+        // CONDITION
+        // =========================
+
         ASTNode conditionNode;
 
         if (ctx.expr() != null) {
             conditionNode = visit(ctx.expr());
         } else {
-            // for(;;) case → infinite loop
             conditionNode = new ASTNode(ASTType.CONSTANT, "TRUE");
         }
 
         f.add(conditionNode);
 
-        // ---- UPDATE ----
+        // =========================
+        // UPDATE
+        // =========================
+
         ASTNode updateNode;
 
         if (ctx.forUpdate() != null) {
@@ -149,11 +147,30 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
 
         f.add(updateNode);
 
-        // ---- BODY ----
+        // =========================
+        // BODY
+        // =========================
+
         f.add(visit(ctx.stat()));
 
         return f;
     }
+
+    @Override
+    public ASTNode visitForUpdate(ExprParser.ForUpdateContext ctx) {
+
+        ASTNode assign = new ASTNode(ASTType.ASSIGN);
+
+        // Left side (ID)
+        assign.add(new ASTNode(ASTType.IDENTIFIER, "VAR"));
+
+        // Right side (expression)
+        assign.add(visit(ctx.expr()));
+
+        return assign;
+    }
+
+
 
     // ===============================
     // EXPRESSIONS
