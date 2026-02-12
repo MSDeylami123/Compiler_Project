@@ -18,5 +18,6 @@ public enum ASTType {
     UNARY_OP,
 
     IDENTIFIER,
-    CONSTANT
+    CONSTANT,
+    EMPTY
 }

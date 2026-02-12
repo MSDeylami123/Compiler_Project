@@ -2,7 +2,6 @@ import org.antlr.v4.runtime.tree.*;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 
-
 public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
 
     // ===============================
@@ -78,29 +77,81 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitIfStat(ExprParser.IfStatContext ctx) {
         ASTNode i = new ASTNode(ASTType.IF);
-        i.add(visit(ctx.expr()));
-        i.add(visit(ctx.stat(0)));
+        i.add(visit(ctx.expr()));          // condition
+        i.add(visit(ctx.stat(0)));         // then
         if (ctx.stat().size() > 1)
-            i.add(visit(ctx.stat(1)));
+            i.add(visit(ctx.stat(1)));     // else
         return i;
     }
 
     @Override
     public ASTNode visitWhileStat(ExprParser.WhileStatContext ctx) {
         ASTNode w = new ASTNode(ASTType.WHILE);
-        w.add(visit(ctx.expr()));
-        w.add(visit(ctx.stat()));
+        w.add(visit(ctx.expr()));          // condition
+        w.add(visit(ctx.stat()));          // body
         return w;
     }
 
+    // ===============================
+    // ✅ FIXED FOR STATEMENT
+    // ===============================
+
     @Override
     public ASTNode visitForStat(ExprParser.ForStatContext ctx) {
+
         ASTNode f = new ASTNode(ASTType.FOR);
 
-        if (ctx.expr() != null)
-            f.add(visit(ctx.expr()));
+        /*
+           Expected grammar structure:
+           FOR '(' (varDecl | assignStat | ';')
+               expr? ';'
+               forUpdate?
+           ')' stat
+        */
 
+        int childIndex = 2; // skip FOR and '('
+
+        // ---- INIT ----
+        ASTNode initNode;
+
+        if (ctx.varDecl() != null) {
+            initNode = visit(ctx.varDecl());
+        }
+        else if (ctx.assignStat() != null) {
+            initNode = visit(ctx.assignStat());
+        }
+        else {
+            initNode = new ASTNode(ASTType.EMPTY);
+        }
+
+        f.add(initNode);
+
+        // ---- CONDITION ----
+        ASTNode conditionNode;
+
+        if (ctx.expr() != null) {
+            conditionNode = visit(ctx.expr());
+        } else {
+            // for(;;) case → infinite loop
+            conditionNode = new ASTNode(ASTType.CONSTANT, "TRUE");
+        }
+
+        f.add(conditionNode);
+
+        // ---- UPDATE ----
+        ASTNode updateNode;
+
+        if (ctx.forUpdate() != null) {
+            updateNode = visit(ctx.forUpdate());
+        } else {
+            updateNode = new ASTNode(ASTType.EMPTY);
+        }
+
+        f.add(updateNode);
+
+        // ---- BODY ----
         f.add(visit(ctx.stat()));
+
         return f;
     }
 
@@ -199,11 +250,11 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
             ctx.CHAR_LITERAL() != null)
             return new ASTNode(ASTType.CONSTANT, "CONST");
 
-        return visit(ctx.expr()); // parenthesis case
+        return visit(ctx.expr());
     }
 
     // ===============================
-    // HELPER: LEFT ASSOCIATIVE BUILDER
+    // HELPER
     // ===============================
 
     private ASTNode buildLeftAssociative(
@@ -214,7 +265,6 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
             return visit(operands.get(0));
 
         ASTNode left = visit(operands.get(0));
-
         int opIndex = 0;
 
         for (List<? extends TerminalNode> opList : operators) {
@@ -234,37 +284,27 @@ public class ASTBuilder extends ExprBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitPostfixExpr(ExprParser.PostfixExprContext ctx) {
 
-        // Just a primary expression (no function call)
         if (ctx.LPAREN().isEmpty()) {
             return visit(ctx.primaryExpr());
         }
 
-        // Start with the base expression (function name or nested expression)
         ASTNode base = visit(ctx.primaryExpr());
 
-        // Each ( ... ) is one function call
         for (int i = 0; i < ctx.LPAREN().size(); i++) {
 
             ASTNode call = new ASTNode(ASTType.FUNCTION_CALL);
-
-            // Add the function being called
             call.add(base);
 
-            // If this call has arguments
             if (i < ctx.argumentList().size()) {
                 ExprParser.ArgumentListContext argListCtx = ctx.argumentList(i);
-
                 for (ExprParser.ExprContext arg : argListCtx.expr()) {
                     call.add(visit(arg));
                 }
             }
 
-            // The result becomes the base for chained calls
             base = call;
         }
 
         return base;
     }
-
-
 }

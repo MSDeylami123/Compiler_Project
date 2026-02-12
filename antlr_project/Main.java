@@ -88,12 +88,6 @@ public class Main {
         System.out.println("\nCFG 2:");
         CFGPrinter.print(cfg2);
 
-        
-
-
-
-
-
 
     }
 
