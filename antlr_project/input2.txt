@@ -1,19 +1,11 @@
-int sum(int n) {
-    int i = 0;
-    int total = 0;
-
-    while (i < n) {
-        if (i == 0) {
-            total = total + i;
-        }
-        i = i + 1;
-    }
-
-    return total;
+int foo() {
+    int x = 5;
+    int y = 6;
+    int z = x + y;
+    return z;
 }
 
-int main() {
-    int x = 10;
-    int result = sum(x);
-    return result;
+int unrelated() {
+    int k = 10;
+    return k;
 }

@@ -59,6 +59,20 @@ public class Main {
 
         printAST(ast1, 0);
         printAST(ast2, 0);
+        // ===============================
+        // Additional AST similarity metrics
+        // ===============================
+        double subtreeSim = ASTComparator.maxSubtreeSimilarity(ast1, ast2);
+        System.out.printf("\nMax Subtree Similarity: %.2f%%\n", subtreeSim * 100);
+
+        // Optional: print a "weighted similarity" using node weights
+        double weightedSim = ASTComparator.similarity(ast1, ast2);
+        System.out.printf("Weighted AST Similarity: %.2f%%\n", weightedSim * 100);
+
+        // Optional: decision based on AST similarity
+        System.out.println("AST Decision: " + (weightedSim >= 0.6 ? "Similar" : "Not Similar"));
+
+
 
     }
 
